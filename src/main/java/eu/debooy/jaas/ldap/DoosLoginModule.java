@@ -64,7 +64,6 @@ public class DoosLoginModule implements LoginModule {
   private static final  Logger  LOGGER            =
       LoggerFactory.getLogger(DoosLoginModule.class);
 
-  private DirContext      ctx;
   private boolean         debug;
   private CallbackHandler handler;
   private Properties      ldap;
@@ -91,26 +90,15 @@ public class DoosLoginModule implements LoginModule {
       }
     } else {
       ldap  = new Properties();
-      ldap.put("checkPassword", String.valueOf(options.get("checkPassword")));
-      ldap.put("factoriesControl",
-               String.valueOf(options.get("factoriesControl")));
-      ldap.put("factoriesInitctx",
-               String.valueOf(options.get("factoriesInitctx")));
-      ldap.put("host", String.valueOf(options.get("host")));
-      if (options.containsKey("password")) {
-        ldap.put("password", String.valueOf(options.get("password")));
+      String[] waardes  = new String[]{"checkPassword", "factoriesControl",
+                                       "factoriesInitctx", "host", "password",
+                                       "roleSearch", "roleSearchbase", "user",
+                                       "userSearch", "userSearchbase"};
+      for (String waarde : waardes) {
+        if (options.containsKey(waarde)) {
+          ldap.put(waarde, String.valueOf(options.get(waarde)));
+        }
       }
-      ldap.put("roleSearch",
-               String.valueOf(options.get("roleSearch")));
-      ldap.put("roleSearchbase",
-               String.valueOf(options.get("roleSearchbase")));
-      if (options.containsKey("user")) {
-        ldap.put("user", String.valueOf(options.get("user")));
-      }
-      ldap.put("userSearch",
-               String.valueOf(options.get("userSearch")));
-      ldap.put("userSearchbase",
-               String.valueOf(options.get("userSearchbase")));
     }
   }
 
@@ -143,7 +131,7 @@ public class DoosLoginModule implements LoginModule {
       if (ldap.containsKey("password")) {
         env.put(Context.SECURITY_CREDENTIALS, ldap.getProperty("password"));
       }
-      ctx = new InitialDirContext(env);
+      DirContext  ctx = new InitialDirContext(env);
 
       // Zoeken naar gebruiker
       String          zoekUid   =
@@ -179,10 +167,9 @@ public class DoosLoginModule implements LoginModule {
       String  checkPassword = ldap.getProperty("checkPassword");
       String  principal     = "";
       if (checkPassword.startsWith("cn=")) {
-        principal = MessageFormat.format(ldap.getProperty("checkPassword"), cn);
+        principal = MessageFormat.format(checkPassword, cn);
       } else {
-        principal = MessageFormat.format(ldap.getProperty("checkPassword"),
-                                         login);
+        principal = MessageFormat.format(checkPassword, login);
       }
       env.put(Context.SECURITY_PRINCIPAL,   principal);
       env.put(Context.SECURITY_CREDENTIALS, password);
