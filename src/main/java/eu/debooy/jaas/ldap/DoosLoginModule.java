@@ -16,8 +16,6 @@
  */
 package eu.debooy.jaas.ldap;
 
-import static org.apache.openejb.loader.IO.readProperties;
-
 import eu.debooy.jaas.RolePrincipal;
 import eu.debooy.jaas.UserPrincipal;
 
@@ -47,7 +45,6 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.LoginException;
 import javax.security.auth.spi.LoginModule;
 
-import org.apache.openejb.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,8 +58,10 @@ import org.slf4j.LoggerFactory;
  * @see javax.security.auth.spi.LoginModule
  */
 public class DoosLoginModule implements LoginModule {
-  private static final  Logger  LOGGER            =
+  private static final  Logger  LOGGER          =
       LoggerFactory.getLogger(DoosLoginModule.class);
+  private static final  String  LOGIN_EXCEPTION =
+      "error.authenticatie.verkeerd";
 
   private boolean         debug;
   private CallbackHandler handler;
@@ -77,27 +76,18 @@ public class DoosLoginModule implements LoginModule {
    */
   public void initialize(Subject subject, CallbackHandler callbackHandler,
                          Map<String, ?> sharedState, Map<String, ?> options) {
-    handler       = callbackHandler;
-    debug         = LOGGER.isDebugEnabled()
+    handler           = callbackHandler;
+    debug             = LOGGER.isDebugEnabled()
         || "true".equalsIgnoreCase(String.valueOf(options.get("debug")));
-    this.subject  = subject;
-    if (options.containsKey("ldap")) {
-      try {
-        ldap  = readProperties(
-            ConfUtils.getConfResource(String.valueOf(options.get("ldap"))));
-      } catch (IOException e) {
-        LOGGER.error(e.getLocalizedMessage());
-      }
-    } else {
-      ldap  = new Properties();
-      String[] waardes  = new String[]{"checkPassword", "factoriesControl",
-                                       "factoriesInitctx", "host", "password",
-                                       "roleSearch", "roleSearchbase", "user",
-                                       "userSearch", "userSearchbase"};
-      for (String waarde : waardes) {
-        if (options.containsKey(waarde)) {
-          ldap.put(waarde, String.valueOf(options.get(waarde)));
-        }
+    this.subject      = subject;
+    ldap              = new Properties();
+    String[] waardes  = new String[]{"checkPassword", "factoriesControl",
+                                     "factoriesInitctx", "host", "password",
+                                     "roleSearch", "roleSearchbase", "user",
+                                     "userSearch", "userSearchbase"};
+    for (String waarde : waardes) {
+      if (options.containsKey(waarde)) {
+        ldap.put(waarde, String.valueOf(options.get(waarde)));
       }
     }
   }
@@ -145,11 +135,11 @@ public class DoosLoginModule implements LoginModule {
                         ctx.search(ldap.getProperty("userSearchbase"),
                                    zoekUid, zoek);
       if (!antwoord.hasMore()) {
-        throw new LoginException("error.authenticatie.verkeerd");
+        throw new LoginException(LOGIN_EXCEPTION);
       }
       SearchResult    sr        = (SearchResult) antwoord.next();
       if (antwoord.hasMore()) {
-        throw new LoginException("error.authenticatie.verkeerd");
+        throw new LoginException(LOGIN_EXCEPTION);
       }
       Attributes      attrs     = sr.getAttributes();
       String          cn        = attrs.get("cn").toString().substring(4);
@@ -195,13 +185,13 @@ public class DoosLoginModule implements LoginModule {
 
       return true;
     } catch (IOException e) {
-      LOGGER.error(e.getLocalizedMessage());
+      LOGGER.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     } catch (UnsupportedCallbackException e) {
-      LOGGER.error(e.getLocalizedMessage());
+      LOGGER.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     } catch (NamingException e) {
-      LOGGER.error(e.getLocalizedMessage());
+      LOGGER.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     }
   }
