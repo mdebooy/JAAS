@@ -33,6 +33,9 @@ public class RolePrincipal implements Principal {
     this.name = name;
   }
 
+  /* (non-Javadoc)
+   * @see java.lang.Object#equals(Object object)
+   */
   @Override
   public boolean equals(Object object) {
     if (!(object instanceof RolePrincipal)) {
@@ -51,6 +54,9 @@ public class RolePrincipal implements Principal {
     return name;
   }
 
+  /* (non-Javadoc)
+   * @see java.lang.Object#hashCode()
+   */
   @Override
   public int hashCode() {
     return name.hashCode();
@@ -61,5 +67,13 @@ public class RolePrincipal implements Principal {
    */
   public void setName(String name) {
     this.name = name;
+  }
+
+  /* (non-Javadoc)
+   * @see java.lang.Object#toString()
+   */
+  @Override
+  public String toString() {
+    return name;
   }
 }

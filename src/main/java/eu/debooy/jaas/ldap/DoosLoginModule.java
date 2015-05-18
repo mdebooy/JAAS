@@ -58,26 +58,66 @@ import org.slf4j.LoggerFactory;
  * @see javax.security.auth.spi.LoginModule
  */
 public class DoosLoginModule implements LoginModule {
-  private static final  Logger  LOGGER          =
-      LoggerFactory.getLogger(DoosLoginModule.class);
   private static final  String  LOGIN_EXCEPTION =
       "error.authenticatie.verkeerd";
 
-  private boolean         debug;
-  private CallbackHandler handler;
-  private Properties      ldap;
-  private RolePrincipal   rolePrincipal;
-  private Subject         subject;
-  private List<String>    userRoles;
-  private UserPrincipal   userPrincipal;
+  private static Logger logger  =
+      LoggerFactory.getLogger(DoosLoginModule.class);
+
+  private boolean             debug;
+  private CallbackHandler     handler;
+  private Properties          ldap;
+  private List<RolePrincipal> rolePrincipals;
+  private Subject             subject;
+  private UserPrincipal       userPrincipal;
+
+  /**
+   * Stop het aanmelden.
+   * 
+   * @exception LoginException als de abort faalt.
+   */
+  public boolean abort() throws LoginException {
+    if (null == userPrincipal) {
+      return false;
+    }
+
+    clear();
+
+    return true;
+  }
+
+  /**
+   * Ruim de gebruikers rechten op.
+   */
+  private void clear() {
+    this.rolePrincipals.clear();
+    this.userPrincipal  = null;
+  }
+
+  /**
+   * Zet de UserPrincipal en RolePrincipal.
+   * 
+   * @exception LoginException als de commit faalt.
+   */
+  public boolean commit() throws LoginException {
+    if (null == userPrincipal) {
+      return false;
+    }
+
+    subject.getPrincipals().add(userPrincipal);
+    subject.getPrincipals().addAll(rolePrincipals);
+    clear();
+
+    return true;
+  }
 
   /**
    * Initialiseer de DoosLoginModule.
    */
-  public void initialize(Subject subject, CallbackHandler callbackHandler,
+  public void initialize(Subject subject, CallbackHandler handler,
                          Map<String, ?> sharedState, Map<String, ?> options) {
-    handler           = callbackHandler;
-    debug             = LOGGER.isDebugEnabled()
+    this.handler      = handler;
+    debug             = logger.isDebugEnabled()
         || "true".equalsIgnoreCase(String.valueOf(options.get("debug")));
     this.subject      = subject;
     ldap              = new Properties();
@@ -151,7 +191,7 @@ public class DoosLoginModule implements LoginModule {
       userPrincipal.setEmail(email);
       userPrincipal.setVolledigeNaam(cn);
       if (debug) {
-        LOGGER.debug(userPrincipal.toString());
+        logger.debug(userPrincipal.toString());
       }
       // Zoeken naar alle rollen.
       String  checkPassword = ldap.getProperty("checkPassword");
@@ -163,75 +203,43 @@ public class DoosLoginModule implements LoginModule {
       }
       env.put(Context.SECURITY_PRINCIPAL,   principal);
       env.put(Context.SECURITY_CREDENTIALS, password);
-      ctx           = new InitialDirContext(env);
-      zoekUid       = MessageFormat.format(ldap.getProperty("roleSearch"),
+      ctx             = new InitialDirContext(env);
+      zoekUid         = MessageFormat.format(ldap.getProperty("roleSearch"),
                                            login);
-      userRoles     = new ArrayList<String>();
-      attrIDs       = new String[]{"cn"};
-      zoek          = new SearchControls();
+      attrIDs         = new String[]{"cn"};
+      zoek            = new SearchControls();
       zoek.setReturningAttributes(attrIDs);
       zoek.setSearchScope(SearchControls.SUBTREE_SCOPE);
-      antwoord      = ctx.search(ldap.getProperty("roleSearchbase"),
-                                 zoekUid, zoek);
+      antwoord        = ctx.search(ldap.getProperty("roleSearchbase"),
+                                   zoekUid, zoek);
+      rolePrincipals  = new ArrayList<RolePrincipal>();
       while (antwoord.hasMore()) {
         sr    = (SearchResult) antwoord.next();
         attrs = sr.getAttributes();
-        userRoles.add(attrs.get("cn").toString().substring(4));
+        rolePrincipals.add(new RolePrincipal(attrs.get("cn").toString()
+                                                  .substring(4)));
       }
+
       antwoord.close();
       if (debug) {
-        LOGGER.debug(userRoles.toString());
+        StringBuilder      rollen  = new StringBuilder();
+        for (RolePrincipal rol : rolePrincipals) {
+          rollen.append(", ").append(rol.toString());
+        }
+        logger.debug(rollen.toString().substring(2));
       }
 
       return true;
     } catch (IOException e) {
-      LOGGER.error(LOGIN_EXCEPTION, e);
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     } catch (UnsupportedCallbackException e) {
-      LOGGER.error(LOGIN_EXCEPTION, e);
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     } catch (NamingException e) {
-      LOGGER.error(LOGIN_EXCEPTION, e);
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     }
-  }
-
-  /**
-   * Zet de UserPrincipal en RolePrincipal.
-   * 
-   * @exception LoginException als de commit faalt.
-   */
-  public boolean commit() throws LoginException {
-    if (null == userPrincipal) {
-      return false;
-    }
-
-    subject.getPrincipals().add(userPrincipal);
-
-    if (null != userRoles && userRoles.size() > 0) {
-      for (String roleNaam : userRoles) {
-        rolePrincipal = new RolePrincipal(roleNaam);
-        subject.getPrincipals().add(rolePrincipal);
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Stop het aanmelden.
-   * 
-   * @exception LoginException als de abort faalt.
-   */
-  public boolean abort() throws LoginException {
-    if (null == userPrincipal) {
-      return false;
-    }
-
-    userRoles     = null;
-    userPrincipal = null;
-
-    return true;
   }
 
   /**
@@ -241,7 +249,8 @@ public class DoosLoginModule implements LoginModule {
    */
   public boolean logout() throws LoginException {
     subject.getPrincipals().remove(userPrincipal);
-    subject.getPrincipals().remove(rolePrincipal);
+    subject.getPrincipals().removeAll(rolePrincipals);
+    clear();
 
     return true;
   }
