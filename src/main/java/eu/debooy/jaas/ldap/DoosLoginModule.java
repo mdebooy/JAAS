@@ -58,8 +58,7 @@ import org.slf4j.LoggerFactory;
  * @see javax.security.auth.spi.LoginModule
  */
 public class DoosLoginModule implements LoginModule {
-  private static final  String  LOGIN_EXCEPTION =
-      "error.authenticatie.verkeerd";
+  private static final String LOGIN_EXCEPTION = "error.authenticatie.verkeerd";
 
   private static Logger logger  =
       LoggerFactory.getLogger(DoosLoginModule.class);
@@ -117,8 +116,8 @@ public class DoosLoginModule implements LoginModule {
   public void initialize(Subject subject, CallbackHandler handler,
                          Map<String, ?> sharedState, Map<String, ?> options) {
     this.handler      = handler;
-    debug             = logger.isDebugEnabled()
-        || "true".equalsIgnoreCase(String.valueOf(options.get("debug")));
+    debug             =
+        "true".equalsIgnoreCase(String.valueOf(options.get("debug")));
     this.subject      = subject;
     ldap              = new Properties();
     String[] waardes  = new String[]{"checkPassword", "factoriesControl",
@@ -191,7 +190,7 @@ public class DoosLoginModule implements LoginModule {
       userPrincipal.setEmail(email);
       userPrincipal.setVolledigeNaam(cn);
       if (debug) {
-        logger.debug(userPrincipal.toString());
+        logger.debug("Logged in as: " + userPrincipal.toString());
       }
       // Zoeken naar alle rollen.
       String  checkPassword = ldap.getProperty("checkPassword");

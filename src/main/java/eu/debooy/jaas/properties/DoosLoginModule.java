@@ -21,6 +21,7 @@ import eu.debooy.jaas.UserPrincipal;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
@@ -43,36 +44,27 @@ import org.slf4j.LoggerFactory;
 
 /**
  * @author Marco de Booij
+ * 
+ * Deze class zorgt ervoor dat de UserPrincipal ook wordt gevuld met het e-mail
+ * adres en de volledige naam van de gebruiker.
+ * 
+ * @see javax.security.auth.spi.LoginModule
  */
 public class DoosLoginModule implements LoginModule {
   private static final String GROUP_FILE      = "GroupsFile";
   private static final String LOGIN_EXCEPTION = "error.authenticatie.verkeerd";
   private static final String USER_FILE       = "UsersFile";
-  private static final String USERINFO_FILE   = "UsersinfoFile";
 
   private static Logger logger  =
       LoggerFactory.getLogger(DoosLoginModule.class);
 
   private boolean             debug;
-  private Properties          groups;
-  private URL                 groupsUrl;
+  private URL                 groups;
   private CallbackHandler     handler;
   private List<RolePrincipal> rolePrincipals;
   private Subject             subject;
-  private String              user;
-  private boolean             userinfo;
   private UserPrincipal       userPrincipal;
-  private Properties          users;
-  private Properties          usersinfo;
-  private URL                 usersinfoUrl;
-  private URL                 usersUrl;
-
-  public DoosLoginModule() {
-    groups    = new Properties();
-    userinfo  = true;
-    users     = new Properties();
-    usersinfo = new Properties();
-  }
+  private URL                 users;
 
   /**
    * Stop het aanmelden.
@@ -122,27 +114,20 @@ public class DoosLoginModule implements LoginModule {
     this.subject = subject;
     this.handler = handler;
 
-    debug = ((logger.isDebugEnabled())
-        || ("true".equalsIgnoreCase(String.valueOf(options.get("debug")))));
+    debug = "true".equalsIgnoreCase(String.valueOf(options.get("debug")));
 
-    String  groupsFile    = String.valueOf(options.get(GROUP_FILE));
-    String  usersFile     = String.valueOf(options.get(USER_FILE));
-    String  usersinfoFile = String.valueOf(options.get(USERINFO_FILE));
-    if (null == usersinfoFile) {
-      usersinfoFile = "";
+    if (!options.containsKey(USER_FILE) || !options.containsKey(GROUP_FILE)) {
+      logger.error("Missing " + USER_FILE + " and/or " + GROUP_FILE);
+      return;
     }
 
-    groupsUrl     = ConfUtils.getConfResource(groupsFile);
-    usersUrl      = ConfUtils.getConfResource(usersFile);
-    if (!usersinfoFile.equals("")) {
-      userinfo  = false;
-    }
+    users   =
+        ConfUtils.getConfResource(String.valueOf(options.get(USER_FILE)));
+    groups  =
+        ConfUtils.getConfResource(String.valueOf(options.get(GROUP_FILE)));
 
-    if (debug) {
-      logger.debug("Users file: " + usersUrl.toExternalForm());
-      logger.debug("Usersinfo file: " + usersinfoUrl.toExternalForm());
-      logger.debug("Groups file: " + groupsUrl.toExternalForm());
-    }
+    logger.debug("Users file: " + users.toExternalForm());
+    logger.debug("Groups file: " + groups.toExternalForm());
   }
 
   /**
@@ -151,11 +136,13 @@ public class DoosLoginModule implements LoginModule {
    * @exception LoginException als het authenticatie faalt.
    */
   public boolean login() throws LoginException {
+    Properties  props = new Properties();
     try {
-      users = IO.readProperties(usersUrl);
+      props = IO.readProperties(users);
     } catch (IOException e) {
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException("Unable to load user properties file "
-                               + usersUrl.getFile());
+                               + users.getFile());
     }
 
     Callback[] callbacks = new Callback[2];
@@ -165,50 +152,49 @@ public class DoosLoginModule implements LoginModule {
     try {
       handler.handle(callbacks);
     } catch (IOException e) {
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage());
     } catch (UnsupportedCallbackException e) {
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException(e.getMessage() + " " + LOGIN_EXCEPTION);
     }
 
-    user  = ((NameCallback) callbacks[0]).getName();
-    char[]  checkPassword = ((PasswordCallback) callbacks[1]).getPassword();
-    if (checkPassword == null) {
-      checkPassword = new char[0];
-    }
+    String  user      = ((NameCallback) callbacks[0]).getName();
+    String  password  =
+        String.valueOf(((PasswordCallback) callbacks[1]).getPassword());
 
-    String  password  = users.getProperty(user);
-    if (password == null) {
+    // Informatie van de gebruiker. Er zijn 3 mogelijke 'velden':
+    // 0 password
+    // 1 Volledige naam
+    // 2 e-mail adres
+    String[]  info      = props.getProperty(user).split("\t");
+    if (info[0] == null) {
       throw new FailedLoginException(LOGIN_EXCEPTION);
     }
 
-    if (!password.equals(new String(checkPassword))) {
+    if (!info[0].equals(password)) {
       throw new FailedLoginException(LOGIN_EXCEPTION);
     }
 
-    users.clear();
+    props.clear();
+
     userPrincipal = new UserPrincipal(user);
-
-    // Haal extra gebruikers informatie.
-    if (userinfo) {
-      try {
-        usersinfo = IO.readProperties(usersinfoUrl);
-        String[]  userinfo  = usersinfo.getProperty(user).split(",");
-        userPrincipal.setEmail(userinfo[0]);
-        userPrincipal.setVolledigeNaam(userinfo[1]);
-      } catch (IOException e) {
-        throw new LoginException("Unable to load userinfo properties file "
-                                 + groupsUrl.getFile());
+    // Vul extra gebruikers informatie indien aanwezig.
+    if (info.length > 1) {
+      userPrincipal.setVolledigeNaam(info[1]);
+      if (info.length > 2) {
+        userPrincipal.setEmail(info[2]);
       }
-      usersinfo.clear();
     }
 
     // Haal de rollen/groepen van de user op.
     try {
-      groups  = IO.readProperties(groupsUrl);
-      Enumeration<Object> keys  = groups.keys();
+      props           = IO.readProperties(groups);
+      rolePrincipals  = new ArrayList<RolePrincipal>();
+      Enumeration<Object> keys  = props.keys();
       while (keys.hasMoreElements()) {
         String    group     = (String) keys.nextElement();
-        String[]  userlist  = groups.getProperty(group).split(",");
+        String[]  userlist  = props.getProperty(group).split(",");
         for (int i = 0; i < userlist.length; i++) {
           if (userlist[i].equals(user)) {
             rolePrincipals.add(new RolePrincipal(group));
@@ -221,16 +207,16 @@ public class DoosLoginModule implements LoginModule {
         for (RolePrincipal rol : rolePrincipals) {
           rollen.append(", ").append(rol);
         }
-        logger.debug(rollen.toString().substring(2));
+        logger.debug("Groups: " + rollen.toString().substring(2));
       }
     } catch (IOException e) {
+      logger.error(LOGIN_EXCEPTION, e);
       throw new LoginException("Unable to load group properties file "
-                               + groupsUrl.getFile());
+                               + groups.getFile());
     }
-    groups.clear();
 
     if (debug) {
-      logger.debug("Logged in as '" + user + "'");
+      logger.debug("Logged in as: " + userPrincipal.toString());
     }
 
     return true;
