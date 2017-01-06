@@ -136,7 +136,7 @@ public class DoosLoginModule implements LoginModule {
    * @exception LoginException als het authenticatie faalt.
    */
   public boolean login() throws LoginException {
-    Properties  props = new Properties();
+    Properties  props;
     try {
       props = IO.readProperties(users);
     } catch (IOException e) {
@@ -175,8 +175,6 @@ public class DoosLoginModule implements LoginModule {
     if (!info[0].equals(password)) {
       throw new FailedLoginException(LOGIN_EXCEPTION);
     }
-
-    props.clear();
 
     userPrincipal = new UserPrincipal(user);
     // Vul extra gebruikers informatie indien aanwezig.
