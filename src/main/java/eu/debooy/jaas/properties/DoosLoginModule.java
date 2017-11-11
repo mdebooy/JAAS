@@ -17,13 +17,13 @@
 package eu.debooy.jaas.properties;
 
 import eu.debooy.jaas.RolePrincipal;
+import eu.debooy.jaas.SpiLoginModule;
 import eu.debooy.jaas.UserPrincipal;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -35,12 +35,12 @@ import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.FailedLoginException;
 import javax.security.auth.login.LoginException;
-import javax.security.auth.spi.LoginModule;
 
 import org.apache.openejb.loader.IO;
 import org.apache.openejb.util.ConfUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * @author Marco de Booij
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @see javax.security.auth.spi.LoginModule
  */
-public class DoosLoginModule implements LoginModule {
+public class DoosLoginModule extends SpiLoginModule {
   private static final String GROUP_FILE      = "GroupsFile";
   private static final String LOGIN_EXCEPTION = "error.authenticatie.verkeerd";
   private static final String USER_FILE       = "UsersFile";
@@ -58,53 +58,8 @@ public class DoosLoginModule implements LoginModule {
   private static Logger logger  =
       LoggerFactory.getLogger(DoosLoginModule.class);
 
-  private boolean             debug;
-  private URL                 groups;
-  private CallbackHandler     handler;
-  private List<RolePrincipal> rolePrincipals;
-  private Subject             subject;
-  private UserPrincipal       userPrincipal;
-  private URL                 users;
-
-  /**
-   * Stop het aanmelden.
-   * 
-   * @exception LoginException als de abort faalt.
-   */
-  public boolean abort() throws LoginException {
-    if (null == userPrincipal) {
-      return false;
-    }
-
-    clear();
-
-    return true;
-  }
-
-  /**
-   * Ruim de gebruikers rechten op.
-   */
-  private void clear() {
-    this.rolePrincipals.clear();
-    this.userPrincipal  = null;
-  }
-
-  /**
-   * Zet de UserPrincipal en RolePrincipal.
-   * 
-   * @exception LoginException als de commit faalt.
-   */
-  public boolean commit() throws LoginException {
-    if (null == userPrincipal) {
-      return false;
-    }
-
-    subject.getPrincipals().add(userPrincipal);
-    subject.getPrincipals().addAll(rolePrincipals);
-    clear();
-
-    return true;
-  }
+  private URL groups;
+  private URL users;
 
   /**
    * Initialiseer de DoosLoginModule.
@@ -167,7 +122,7 @@ public class DoosLoginModule implements LoginModule {
     // 0 password
     // 1 Volledige naam
     // 2 e-mail adres
-    String[]  info      = props.getProperty(user).split("\t");
+    String[]  info      = props.getProperty(user).split("\t", -1);
     if (info[0] == null) {
       throw new FailedLoginException(LOGIN_EXCEPTION);
     }
@@ -216,19 +171,6 @@ public class DoosLoginModule implements LoginModule {
     if (debug) {
       logger.debug("Logged in as: " + userPrincipal.toString());
     }
-
-    return true;
-  }
-
-  /**
-   * Doe een logout.
-   * 
-   * @exception LoginException als de logout faalt.
-   */
-  public boolean logout() throws LoginException {
-    subject.getPrincipals().remove(userPrincipal);
-    subject.getPrincipals().removeAll(rolePrincipals);
-    clear();
 
     return true;
   }
