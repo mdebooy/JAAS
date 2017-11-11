@@ -12,8 +12,8 @@
   <description>JAAS met extra informatie in UserPrincipal</description>
   <inceptionYear>2014</inceptionYear>
   <scm>
-    <developerConnection>scm:svn:http://svn.debooy.eu/svn/JAAS/trunk</developerConnection>
-    <connection>scm:svn:http://svn.debooy.eu/svn/JAAS/trunk</connection>
+    <developerConnection>scm:git:ssh://ptah.debooy.eu/srv/git/debooy/JAAS.git</developerConnection>
+    <connection>scm:git:ssh://ptah.debooy.eu/srv/git/debooy/JAAS.git</connection>
   </scm>
 
   <developers>
