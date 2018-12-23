@@ -7,13 +7,14 @@
   </parent>
   <groupId>eu.debooy.jaas</groupId>
   <artifactId>jaas</artifactId>
-  <version>1.0.1-SNAPSHOT</version>
+  <version>1.1.0</version>
   <name>JAAS</name>
   <description>JAAS met extra informatie in UserPrincipal</description>
   <inceptionYear>2014</inceptionYear>
   <scm>
     <developerConnection>scm:git:ssh://ptah.debooy.eu/srv/git/debooy/JAAS.git</developerConnection>
     <connection>scm:git:ssh://ptah.debooy.eu/srv/git/debooy/JAAS.git</connection>
+    <tag>jaas-1.1.0</tag>
   </scm>
 
   <developers>
